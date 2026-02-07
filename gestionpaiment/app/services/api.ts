@@ -1,12 +1,10 @@
+// CORRECTION COMPLÈTE du fichier api.ts
 import { User, AuthResponse } from '@/app/types';
+import { Session } from '@/app/types';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'http://localhost:8082/api';
 
 class ApiService {
-
-  // ===========================================================
-  // 🔒 Requête avec session + gestion JSON automatiquement
-  // ===========================================================
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
     const response = await fetch(`${API_BASE_URL}${url}`, {
       ...options,
@@ -20,26 +18,21 @@ class ApiService {
     const contentType = response.headers.get('content-type');
     const responseText = await response.text();
 
-    // --- Gestion des erreurs ---
     if (!response.ok) {
       let errorMessage = responseText;
-
       try {
         const errorData = JSON.parse(responseText);
         errorMessage = errorData.error || errorData.message || errorMessage;
       } catch {
         // si ce n'est pas du JSON, on garde le texte tel quel
       }
-
       throw new Error(errorMessage);
     }
 
-    // --- Réponse vide (DELETE etc.) ---
     if (!responseText || !contentType?.includes('application/json')) {
       return responseText || null;
     }
 
-    // --- Réponse JSON ---
     try {
       return JSON.parse(responseText);
     } catch {
@@ -78,14 +71,13 @@ class ApiService {
     });
   }
 
-  // ⭐⭐⭐ CORRECTION ICI : checkAuth doit renvoyer un type générique ⭐⭐⭐
   async checkAuth(): Promise<{ authenticated: boolean; id?: number; email?: string; roles?: string[] }> {
     try {
       return await this.fetchWithAuth('/auth/check-auth', {
         method: 'GET',
       });
     } catch (e) {
-      return { authenticated: false }; // éviter les crashs côté Front
+      return { authenticated: false };
     }
   }
 
@@ -119,7 +111,24 @@ class ApiService {
   }
 
   async getFormateurs(): Promise<User[]> {
-    return this.fetchWithAuth('/admin/formateurs');
+    try {
+      console.log('🔄 Appel API: /admin/formateurs');
+      const response = await this.fetchWithAuth('/admin/formateurs');
+      
+      console.log('📋 Réponse formateurs:', {
+        type: typeof response,
+        isArray: Array.isArray(response),
+        data: response
+      });
+      
+      const formateursArray = Array.isArray(response) ? response : [];
+      console.log(`👨‍🏫 ${formateursArray.length} formateurs trouvés`);
+      
+      return formateursArray;
+    } catch (error: any) {
+      console.error('❌ Erreur récupération formateurs:', error);
+      return [];
+    }
   }
 
   async getCoordinateurs(): Promise<User[]> {
@@ -128,7 +137,6 @@ class ApiService {
 
   async deleteUser(userId: number): Promise<void> {
     console.log(`🗑️ Suppression utilisateur ID: ${userId}`);
-
     try {
       await this.fetchWithAuth(`/admin/users/${userId}`, {
         method: 'DELETE',
@@ -139,6 +147,103 @@ class ApiService {
       throw error;
     }
   }
+
+  // ===========================================================
+  // 👨‍🏫 SESSIONS FORMATEUR
+  // ===========================================================
+  async getSessions(): Promise<Session[]> {
+    try {
+      const response = await this.fetchWithAuth('/sessions');
+      console.log('📋 Sessions reçues:', response);
+      return Array.isArray(response) ? response : [];
+    } catch (error) {
+      console.error('Erreur lors de la récupération des sessions:', error);
+      return [];
+    }
+  }
+
+  async assignerFormateur(sessionId: number, formateurId: number): Promise<Session> {
+    console.log(`🎯 Assigner formateur ${formateurId} à session ${sessionId}`);
+    return this.fetchWithAuth(`/sessions/${sessionId}/assign-formateur/${formateurId}`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  async retirerFormateur(sessionId: number, formateurId: number): Promise<Session> {
+    console.log(`🗑️ Retirer formateur ${formateurId} de session ${sessionId}`);
+    return this.fetchWithAuth(`/sessions/${sessionId}/retirer/${formateurId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async isFormateurInSession(sessionId: number, formateurId: number): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(`/sessions/${sessionId}/check-formateur/${formateurId}`);
+      return response === true || response === 'true';
+    } catch (error) {
+      console.warn(`Endpoint /sessions/${sessionId}/check-formateur/${formateurId} non disponible, retour false par défaut`);
+      return false;
+    }
+  }
+
+  // ===========================================================
+  // 📚 SESSIONS (méthodes pour coordinateur)
+  // ===========================================================
+  async getSessionById(id: number): Promise<Session> {
+    return this.fetchWithAuth(`/sessions/${id}`);
+  }
+
+  async createSession(sessionData: any): Promise<Session> {
+    return this.fetchWithAuth('/sessions', {
+      method: 'POST',
+      body: JSON.stringify(sessionData),
+    });
+  }
+
+  async updateSession(id: number, sessionData: Partial<Session>): Promise<Session> {
+    return this.fetchWithAuth(`/sessions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(sessionData),
+    });
+  }
+
+  async deleteSession(id: number): Promise<void> {
+    return this.fetchWithAuth(`/sessions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ===========================================================
+  // 🔥 Sessions par formateur
+  // ===========================================================
+  async getSessionsByFormateur(formateurId: number): Promise<Session[]> {
+    try {
+      const response = await this.fetchWithAuth(`/sessions/formateur/${formateurId}`);
+      console.log(`📋 Sessions pour formateur ${formateurId}:`, response);
+      return Array.isArray(response) ? response : [];
+    } catch (error) {
+      console.error('Erreur récupération sessions formateur:', error);
+      return [];
+    }
+  }
+
+  // ===========================================================
+  // 🔥 Affectation formateur (pour coordinateur)
+  // ===========================================================
+  async affecterFormateurSession(sessionId: number, formateurId: number): Promise<void> {
+    await this.fetchWithAuth(`/sessions/${sessionId}/affecter`, {
+      method: 'POST',
+      body: JSON.stringify({ formateurId })
+    });
+  }
+
+  async retirerFormateurSession(sessionId: number): Promise<void> {
+    await this.fetchWithAuth(`/sessions/${sessionId}/retirer`, {
+      method: 'POST'
+    });
+  }
 }
 
+// ✅ EXPORT CORRECT
 export const apiService = new ApiService();

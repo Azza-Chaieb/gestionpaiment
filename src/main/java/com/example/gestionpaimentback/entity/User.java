@@ -70,6 +70,9 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
+
+    @ManyToMany(mappedBy = "formateurs")
+    private Set<Session> sessions = new HashSet<>();
     // Constructeurs
     public User() {}
 
@@ -120,4 +123,6 @@ public class User {
 
     public Set<Role> getRoles() { return roles; }
     public void setRoles(Set<Role> roles) { this.roles = roles; }
+    public Set<Session> getSessions() { return sessions; }
+    public void setSessions(Set<Session> sessions) { this.sessions = sessions; }
 }

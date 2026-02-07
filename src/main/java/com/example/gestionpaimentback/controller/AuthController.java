@@ -30,30 +30,22 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-
     @Autowired
     private AuthService authService;
-
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
-
     @Autowired
     private PasswordEncoder passwordEncoder;
-
     @Autowired
     private EmailService emailService;
-
     @Autowired
     private UserRepository userRepository;
     @Autowired
     PasswordEncoder encoder;
-
     @PostMapping("/generate")
     public String generate() {
         return encoder.encode("admin123");
     }
-
-
     @PostMapping("/signin")
     public ResponseEntity<?> initiateLogin(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
         try {
@@ -226,7 +218,6 @@ public class AuthController {
                 errorResponse.put("error", "Cet email est déjà utilisé!");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
-
             User user = authService.registerUser(registerRequest);
             System.out.println("✅ UTILISATEUR INSCRIT : " + user.getEmail());
             System.out.println("📊 STATUT UTILISATEUR : " + user.getStatus());
@@ -241,9 +232,7 @@ public class AuthController {
             response.put("roles", user.getRoles().stream()
                     .map(role -> role.getName().name())
                     .collect(Collectors.toList()));
-
             return ResponseEntity.ok(response);
-
         } catch (Exception e) {
             System.out.println("❌ ERREUR INSCRIPTION : " + e.getMessage());
             Map<String, String> errorResponse = new HashMap<>();

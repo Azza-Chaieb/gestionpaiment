@@ -2,55 +2,101 @@ package com.example.gestionpaimentback.service;
 
 import com.example.gestionpaimentback.entity.Role;
 import com.example.gestionpaimentback.entity.User;
-import com.example.gestionpaimentback.repository.RoleRepository;
 import com.example.gestionpaimentback.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AdminService {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-    public AdminService(UserRepository userRepository, RoleRepository roleRepository) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-    }
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        try {
+            List<User> users = userRepository.findAll();
+            System.out.println("✅ " + users.size() + " utilisateurs trouvés");
+            return users;
+        } catch (Exception e) {
+            System.out.println("❌ Erreur dans getAllUsers: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
-
-
 
     public List<User> getFormateurs() {
-        Role formateurRole = roleRepository.findByName(Role.ERole.ROLE_FORMATEUR)
-                .orElseThrow(() -> new RuntimeException("Role FORMATEUR introuvable"));
+        try {
+            // Méthode 1: Via le repository avec une requête personnalisée
+            List<User> formateurs = userRepository.findByRoles_Name(Role.ERole.ROLE_FORMATEUR);
 
-        return userRepository.findUsersByRole(formateurRole);
+            // Si la méthode 1 ne fonctionne pas, utilisez la méthode 2
+            if (formateurs == null || formateurs.isEmpty()) {
+                System.out.println("🔄 Méthode 1 échouée, utilisation méthode 2...");
+
+                // Méthode 2: Filtrer manuellement
+                List<User> allUsers = userRepository.findAll();
+                formateurs = allUsers.stream()
+                        .filter(user -> user.getRoles().stream()
+                                .anyMatch(role -> role.getName() == Role.ERole.ROLE_FORMATEUR))
+                        .collect(Collectors.toList());
+            }
+
+            System.out.println("✅ " + formateurs.size() + " formateurs trouvés dans le service");
+
+            // Debug: afficher les formateurs
+            for (User formateur : formateurs) {
+                System.out.println("👨‍🏫 Formateur: " + formateur.getFirstName() + " " + formateur.getLastName() +
+                        " - " + formateur.getEmail() + " - ID: " + formateur.getId());
+            }
+
+            return formateurs;
+        } catch (Exception e) {
+            System.out.println("❌ Erreur dans getFormateurs: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
     }
 
     public List<User> getCoordinateurs() {
-        Role coordRole = roleRepository.findByName(Role.ERole.ROLE_COORDINATEUR)
-                .orElseThrow(() -> new RuntimeException("Role COORDINATEUR introuvable"));
+        try {
+            // Méthode 1: Via le repository avec une requête personnalisée
+            List<User> coordinateurs = userRepository.findByRoles_Name(Role.ERole.ROLE_COORDINATEUR);
 
-        return userRepository.findUsersByRole(coordRole);
+            // Si la méthode 1 ne fonctionne pas, utilisez la méthode 2
+            if (coordinateurs == null || coordinateurs.isEmpty()) {
+                System.out.println("🔄 Méthode 1 échouée, utilisation méthode 2...");
+
+                // Méthode 2: Filtrer manuellement
+                List<User> allUsers = userRepository.findAll();
+                coordinateurs = allUsers.stream()
+                        .filter(user -> user.getRoles().stream()
+                                .anyMatch(role -> role.getName() == Role.ERole.ROLE_COORDINATEUR))
+                        .collect(Collectors.toList());
+            }
+
+            System.out.println("✅ " + coordinateurs.size() + " coordinateurs trouvés dans le service");
+            return coordinateurs;
+        } catch (Exception e) {
+            System.out.println("❌ Erreur dans getCoordinateurs: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
-    @Transactional
     public void deleteUser(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'ID: " + id));
-
-        // Vider les collections avant suppression
-        user.getRoles().clear();
-
-        // Sauvegarder pour vider les relations
-        userRepository.save(user);
-
-        // Maintenant supprimer l'utilisateur
-        userRepository.delete(user);
+        try {
+            if (userRepository.existsById(id)) {
+                userRepository.deleteById(id);
+                System.out.println("✅ Utilisateur " + id + " supprimé avec succès");
+            } else {
+                System.out.println("❌ Utilisateur " + id + " non trouvé");
+                throw new RuntimeException("Utilisateur non trouvé");
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Erreur dans deleteUser: " + e.getMessage());
+            throw new RuntimeException("Erreur lors de la suppression: " + e.getMessage());
+        }
     }
 }
